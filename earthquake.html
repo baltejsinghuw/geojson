@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Earthquake Map</title>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.css" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            display: flex;
+            height: 100vh;
+            overflow: hidden; /* Prevent scrolling of body */
+        }
+        #container {
+            display: flex;
+            flex: 1;
+            height: 100%;
+            overflow: hidden; /* Prevent scrolling of body */
+        }
+        #map {
+            flex: 1;
+            height: 100vh;
+        }
+        #side-panel {
+            flex-basis: 300px;
+            overflow-y: auto;
+            background-color: #f0f0f0;
+            padding: 10px;
+            position: relative;
+            z-index: 1; /* Ensure side panel is above map */
+            display: block;
+        }
+        button {
+            margin-bottom: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        @media screen and (max-width: 1024px) {
+            #side-panel {
+                display: none;
+            }
+            #map {
+                width: 100%;
+                height: 100vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main id="container">
+        <div id="map"></div>
+        <div id="side-panel">
+            <h2>Earthquake Data</h2>
+            <button id="sortButton">Sort by Magnitude</button>
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Magnitude</th>
+                        <th>Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </main>
+
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.js"></script>
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1IjoiYmFsdGVqNyIsImEiOiJjbHlqNzUzenUwYXI4MmtxMzU1NDl2Ym01In0.ywfyGewrUlGsBVhtrPKNyQ';
+
+        function createMap() {
+            let map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/dark-v10', // Different map style
+                zoom: 5.5,
+                center: [138, 38]
+            });
+
+            map.on('load', function () {
+                // Add GeoJSON layer
+                addGeoJSONLayer(map, 'earthquakes', 'assets/earthquakes.geojson', 'red');
+
+                // Function to add GeoJSON layer to map
+                function addGeoJSONLayer(map, sourceName, geojsonPath, circleColor) {
+                    fetch(geojsonPath)
+                        .then(response => response.json())
+                        .then(data => {
+                            map.addSource(sourceName, {
+                                type: 'geojson',
+                                data: data
+                            });
+
+                            map.addLayer({
+                                'id': sourceName + '-layer',
+                                'type': 'circle',
+                                'source': sourceName,
+                                'paint': {
+                                    'circle-radius': 8,
+                                    'circle-stroke-width': 2,
+                                    'circle-color': circleColor,
+                                    'circle-stroke-color': 'white'
+                                }
+                            });
+
+                            // Populate table with data
+                            populateTable(data, sourceName);
+                        })
+                        .catch(error => {
+                            console.error('Error fetching GeoJSON data:', error);
+                        });
+                }
+
+                // Function to populate table with GeoJSON data
+                function populateTable(data, sourceName) {
+                    let table = document.getElementById('dataTable');
+                    data.features.forEach(feature => {
+                        let row = table.insertRow();
+                        row.insertCell(0).textContent = feature.properties.id;
+                        row.insertCell(1).textContent = feature.properties.mag || ''; // Adjusted to match GeoJSON properties
+                        row.insertCell(2).textContent = new Date(feature.properties.time).toLocaleString() || ''; // Adjusted to match GeoJSON properties
+                    });
+                }
+
+                // Function to sort table by magnitude
+                function sortTable() {
+                    let table = document.getElementById('dataTable');
+                    let rows = Array.from(table.rows).slice(1); // Exclude header row
+                    rows.sort((a, b) => {
+                        let magA = parseFloat(a.cells[1].textContent);
+                        let magB = parseFloat(b.cells[1].textContent);
+                        return magB - magA; // Sort by magnitude descending
+                    });
+                    rows.forEach(row => table.appendChild(row)); // Append sorted rows back to table
+                }
+
+                // Event listener for sort button
+                document.getElementById('sortButton').addEventListener('click', sortTable);
+            });
+        }
+
+        createMap();
+    </script>
+</body>
+</html>
